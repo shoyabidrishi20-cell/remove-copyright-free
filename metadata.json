@@ -1,0 +1,8 @@
+{
+  "name": "CR Remover",
+  "description": "Copyright claim, Content ID, and strike removal portal with instant UPI QR, Google Pay, Paytm, and PhonePe checkout.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

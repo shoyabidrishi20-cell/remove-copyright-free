@@ -1,0 +1,528 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Safety Net (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    // Global Hardened Primitives
+    // -------------------------------------------------------------------------
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidDateKey(dateKey) {
+      return dateKey is string && dateKey.size() == 10 && dateKey.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+    }
+
+    function isValidString(val, minLen, maxLen) {
+      return val is string && val.size() >= minLen && val.size() <= maxLen;
+    }
+
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isBootstrappedAdmin() {
+      return isSignedIn() && request.auth.token.email == 'shoyabidrishi77@gmail.com';
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        isBootstrappedAdmin() ||
+        (exists(/databases/$(database)/documents/admins/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.active == true)
+      );
+    }
+
+    // -------------------------------------------------------------------------
+    // Entity Validation Blueprints
+    // -------------------------------------------------------------------------
+    function isValidAdminRole(data) {
+      return data.keys().hasAll(['uid', 'email', 'displayName', 'role', 'active', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'email', 'displayName', 'role', 'active', 'createdAt', 'updatedAt'])
+        && isValidId(data.uid)
+        && isValidString(data.email, 5, 160)
+        && isValidString(data.displayName, 1, 100)
+        && data.role in ['super_admin', 'admin']
+        && data.active is bool
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidUserAccount(data) {
+      return data.keys().hasAll(['uid', 'displayName', 'channelName', 'role', 'status', 'totalCases', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'displayName', 'channelName', 'role', 'status', 'totalCases', 'createdAt', 'updatedAt'])
+        && isValidId(data.uid)
+        && isValidString(data.displayName, 1, 100)
+        && isValidString(data.channelName, 0, 120)
+        && data.role in ['creator', 'moderator', 'admin']
+        && data.status in ['active', 'suspended']
+        && data.totalCases is int
+        && data.totalCases >= 0
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidUserPrivateInfo(data) {
+      return data.keys().hasAll(['uid', 'email', 'phone', 'notes', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'email', 'phone', 'notes', 'updatedAt'])
+        && isValidId(data.uid)
+        && isValidString(data.email, 5, 160)
+        && isValidString(data.phone, 0, 32)
+        && isValidString(data.notes, 0, 500)
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidCaseOrder(data) {
+      return data.keys().hasAll([
+          'caseId', 'ownerUid', 'serviceId', 'serviceTitle', 'platform',
+          'videoUrl', 'claimantName', 'creatorName', 'contact', 'amountInr',
+          'status', 'paymentApp', 'utrNumber', 'adminNotes', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'caseId', 'ownerUid', 'serviceId', 'serviceTitle', 'platform',
+          'videoUrl', 'claimantName', 'creatorName', 'contact', 'amountInr',
+          'status', 'paymentApp', 'utrNumber', 'adminNotes', 'createdAt', 'updatedAt', 'paidAt'
+        ])
+        && isValidId(data.caseId)
+        && isValidId(data.ownerUid)
+        && isValidString(data.serviceId, 1, 64)
+        && isValidString(data.serviceTitle, 1, 120)
+        && data.platform in ['YouTube', 'Instagram Reels', 'Facebook Video', 'YouTube Shorts']
+        && isValidString(data.videoUrl, 5, 500)
+        && isValidString(data.claimantName, 0, 160)
+        && isValidString(data.creatorName, 2, 120)
+        && isValidString(data.contact, 5, 160)
+        && (data.amountInr is int || data.amountInr is float)
+        && data.amountInr >= 0
+        && data.amountInr <= 1000000
+        && data.status in ['awaiting_payment', 'verifying_payment', 'dispute_filed', 'claim_released', 'rejected']
+        && data.paymentApp in ['phonepe', 'gpay', 'paytm', 'qr', 'none']
+        && isValidString(data.utrNumber, 0, 16)
+        && isValidString(data.adminNotes, 0, 1000)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp
+        && (!('paidAt' in data) || data.paidAt is timestamp);
+    }
+
+    function isValidPaymentRecord(data) {
+      return data.keys().hasAll([
+          'paymentId', 'caseId', 'ownerUid', 'payerName', 'paymentApp',
+          'utrNumber', 'amountInr', 'currency', 'verificationStatus',
+          'verifiedByUid', 'notes', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'paymentId', 'caseId', 'ownerUid', 'payerName', 'paymentApp',
+          'utrNumber', 'amountInr', 'currency', 'verificationStatus',
+          'verifiedByUid', 'notes', 'createdAt', 'updatedAt', 'verifiedAt'
+        ])
+        && isValidId(data.paymentId)
+        && isValidId(data.caseId)
+        && isValidId(data.ownerUid)
+        && isValidString(data.payerName, 1, 120)
+        && data.paymentApp in ['phonepe', 'gpay', 'paytm', 'qr']
+        && data.utrNumber is string
+        && data.utrNumber.matches('^[0-9]{12}$')
+        && (data.amountInr is int || data.amountInr is float)
+        && data.amountInr > 0
+        && data.amountInr <= 1000000
+        && data.currency == 'INR'
+        && data.verificationStatus in ['pending', 'verified', 'rejected', 'refunded']
+        && isValidString(data.verifiedByUid, 0, 128)
+        && isValidString(data.notes, 0, 500)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp
+        && (!('verifiedAt' in data) || data.verifiedAt is timestamp);
+    }
+
+    function isValidSiteContent(data) {
+      return data.keys().hasAll([
+          'sectionId', 'eyebrow', 'headline', 'subheadline',
+          'primaryCta', 'secondaryCta', 'qrImageUrl', 'footerTagline',
+          'updatedByUid', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'sectionId', 'eyebrow', 'headline', 'subheadline',
+          'primaryCta', 'secondaryCta', 'qrImageUrl', 'footerTagline',
+          'updatedByUid', 'updatedAt'
+        ])
+        && isValidId(data.sectionId)
+        && isValidString(data.eyebrow, 0, 120)
+        && isValidString(data.headline, 1, 220)
+        && isValidString(data.subheadline, 0, 500)
+        && isValidString(data.primaryCta, 0, 80)
+        && isValidString(data.secondaryCta, 0, 80)
+        && isValidString(data.qrImageUrl, 0, 300)
+        && isValidString(data.footerTagline, 0, 200)
+        && isValidId(data.updatedByUid)
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidServicePlan(data) {
+      return data.keys().hasAll([
+          'serviceId', 'code', 'title', 'subtitle', 'priceInr',
+          'turnaround', 'scope', 'active', 'sortOrder', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'serviceId', 'code', 'title', 'subtitle', 'priceInr',
+          'turnaround', 'scope', 'active', 'sortOrder', 'updatedAt'
+        ])
+        && isValidId(data.serviceId)
+        && isValidString(data.code, 1, 10)
+        && isValidString(data.title, 2, 120)
+        && isValidString(data.subtitle, 2, 300)
+        && (data.priceInr is int || data.priceInr is float)
+        && data.priceInr >= 1
+        && data.priceInr <= 1000000
+        && isValidString(data.turnaround, 1, 60)
+        && isValidString(data.scope, 1, 60)
+        && data.active is bool
+        && data.sortOrder is int
+        && data.sortOrder >= 0
+        && data.sortOrder <= 1000
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidFaqItem(data) {
+      return data.keys().hasAll(['faqId', 'question', 'answer', 'sortOrder', 'active', 'updatedAt'])
+        && data.keys().hasOnly(['faqId', 'question', 'answer', 'sortOrder', 'active', 'updatedAt'])
+        && isValidId(data.faqId)
+        && isValidString(data.question, 5, 240)
+        && isValidString(data.answer, 5, 1200)
+        && data.sortOrder is int
+        && data.sortOrder >= 0
+        && data.sortOrder <= 1000
+        && data.active is bool
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidSiteSettings(data) {
+      return data.keys().hasAll([
+          'settingId', 'siteName', 'supportEmail', 'supportWhatsapp',
+          'upiDisplayLabel', 'upiMerchantName', 'maintenanceMode',
+          'allowNewOrders', 'strictUtrValidation', 'updatedByUid', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'settingId', 'siteName', 'supportEmail', 'supportWhatsapp',
+          'upiDisplayLabel', 'upiMerchantName', 'maintenanceMode',
+          'allowNewOrders', 'strictUtrValidation', 'updatedByUid', 'updatedAt'
+        ])
+        && isValidId(data.settingId)
+        && isValidString(data.siteName, 1, 80)
+        && isValidString(data.supportEmail, 5, 160)
+        && isValidString(data.supportWhatsapp, 0, 32)
+        && isValidString(data.upiDisplayLabel, 1, 80)
+        && isValidString(data.upiMerchantName, 1, 80)
+        && data.maintenanceMode is bool
+        && data.allowNewOrders is bool
+        && data.strictUtrValidation is bool
+        && isValidId(data.updatedByUid)
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidAnalyticsSnapshot(data) {
+      return data.keys().hasAll([
+          'dateKey', 'pageViews', 'checkoutStarts', 'ordersCreated',
+          'paymentsVerified', 'revenueInr', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'dateKey', 'pageViews', 'checkoutStarts', 'ordersCreated',
+          'paymentsVerified', 'revenueInr', 'updatedAt'
+        ])
+        && isValidDateKey(data.dateKey)
+        && data.pageViews is int && data.pageViews >= 0
+        && data.checkoutStarts is int && data.checkoutStarts >= 0
+        && data.ordersCreated is int && data.ordersCreated >= 0
+        && data.paymentsVerified is int && data.paymentsVerified >= 0
+        && (data.revenueInr is int || data.revenueInr is float) && data.revenueInr >= 0
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidAuditLog(data) {
+      return data.keys().hasAll([
+          'logId', 'actorUid', 'actorEmail', 'action',
+          'targetType', 'targetId', 'summary', 'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'logId', 'actorUid', 'actorEmail', 'action',
+          'targetType', 'targetId', 'summary', 'createdAt'
+        ])
+        && isValidId(data.logId)
+        && isValidId(data.actorUid)
+        && isValidString(data.actorEmail, 5, 160)
+        && isValidString(data.action, 1, 80)
+        && isValidString(data.targetType, 1, 40)
+        && isValidString(data.targetId, 1, 128)
+        && isValidString(data.summary, 1, 300)
+        && data.createdAt is timestamp;
+    }
+
+    // -------------------------------------------------------------------------
+    // Collection Rules
+    // -------------------------------------------------------------------------
+
+    // Health / connectivity check document
+    match /test/{docId} {
+      allow get: if isValidId(docId) && isSignedIn();
+    }
+
+    // Authorized Administrators RBAC directory
+    match /admins/{uid} {
+      allow get: if isValidId(uid) && (isOwner(uid) || isAdmin());
+      allow list: if isAdmin();
+      allow create: if isValidId(uid)
+        && isAdmin()
+        && isValidAdminRole(incoming())
+        && incoming().uid == uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(uid)
+        && isAdmin()
+        && isValidAdminRole(incoming())
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && !(uid == request.auth.uid && incoming().active == false)
+        && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'role', 'active', 'updatedAt']);
+      allow delete: if isValidId(uid) && isAdmin() && uid != request.auth.uid;
+    }
+
+    // Public user metadata (no PII) + isolated private PII subcollection
+    match /users/{userId} {
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if isAdmin();
+      allow create: if isValidId(userId)
+        && isSignedIn()
+        && isValidUserAccount(incoming())
+        && incoming().uid == userId
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && (
+          (isOwner(userId) && incoming().role == 'creator' && incoming().status == 'active' && incoming().totalCases == 0) ||
+          isAdmin()
+        );
+      allow update: if isValidId(userId)
+        && isSignedIn()
+        && isValidUserAccount(incoming())
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          (isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'channelName', 'updatedAt'])) ||
+          (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'channelName', 'role', 'status', 'totalCases', 'updatedAt']))
+        );
+      allow delete: if isValidId(userId) && isAdmin();
+
+      match /private/{docId} {
+        allow get: if isValidId(userId) && isValidId(docId) && (isOwner(userId) || isAdmin());
+        allow list: if isOwner(userId) || isAdmin();
+        allow create: if isValidId(userId)
+          && isValidId(docId)
+          && (isOwner(userId) || isAdmin())
+          && isValidUserPrivateInfo(incoming())
+          && incoming().uid == userId
+          && incoming().updatedAt == request.time;
+        allow update: if isValidId(userId)
+          && isValidId(docId)
+          && (isOwner(userId) || isAdmin())
+          && isValidUserPrivateInfo(incoming())
+          && incoming().uid == existing().uid
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['email', 'phone', 'notes', 'updatedAt']);
+        allow delete: if isValidId(userId) && isValidId(docId) && isAdmin();
+      }
+    }
+
+    // Copyright Claim Removal Orders
+    match /orders/{caseId} {
+      allow get: if isValidId(caseId) && (isAdmin() || (isSignedIn() && existing().ownerUid == request.auth.uid));
+      allow list: if isAdmin() || (isSignedIn() && resource.data.ownerUid == request.auth.uid);
+      allow create: if isValidId(caseId)
+        && isSignedIn()
+        && isValidCaseOrder(incoming())
+        && incoming().caseId == caseId
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && (
+          (incoming().ownerUid == request.auth.uid && incoming().status == 'awaiting_payment' && incoming().adminNotes == '') ||
+          isAdmin()
+        );
+      allow update: if isValidId(caseId)
+        && isSignedIn()
+        && isValidCaseOrder(incoming())
+        && incoming().caseId == existing().caseId
+        && incoming().ownerUid == existing().ownerUid
+        && incoming().amountInr == existing().amountInr
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'paymentApp', 'utrNumber', 'adminNotes', 'updatedAt', 'paidAt'])) ||
+          (
+            existing().ownerUid == request.auth.uid
+            && existing().status == 'awaiting_payment'
+            && incoming().status == 'verifying_payment'
+            && incoming().paymentApp in ['phonepe', 'gpay', 'paytm', 'qr']
+            && incoming().utrNumber.matches('^[0-9]{12}$')
+            && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'paymentApp', 'utrNumber', 'paidAt', 'updatedAt'])
+          )
+        );
+      allow delete: if isValidId(caseId) && isAdmin();
+    }
+
+    // UPI Payment Verification Ledger
+    match /payments/{paymentId} {
+      allow get: if isValidId(paymentId) && (isAdmin() || (isSignedIn() && existing().ownerUid == request.auth.uid));
+      allow list: if isAdmin() || (isSignedIn() && resource.data.ownerUid == request.auth.uid);
+      allow create: if isValidId(paymentId)
+        && isSignedIn()
+        && isValidPaymentRecord(incoming())
+        && incoming().paymentId == paymentId
+        && exists(/databases/$(database)/documents/orders/$(incoming().caseId))
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && (
+          (
+            incoming().ownerUid == request.auth.uid
+            && incoming().verificationStatus == 'pending'
+            && incoming().verifiedByUid == ''
+            && get(/databases/$(database)/documents/orders/$(incoming().caseId)).data.ownerUid == request.auth.uid
+            && incoming().amountInr == get(/databases/$(database)/documents/orders/$(incoming().caseId)).data.amountInr
+          ) ||
+          isAdmin()
+        );
+      allow update: if isValidId(paymentId)
+        && isAdmin()
+        && isValidPaymentRecord(incoming())
+        && incoming().paymentId == existing().paymentId
+        && incoming().caseId == existing().caseId
+        && incoming().ownerUid == existing().ownerUid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['verificationStatus', 'verifiedByUid', 'verifiedAt', 'notes', 'updatedAt']);
+      allow delete: if isValidId(paymentId) && isAdmin();
+    }
+
+    // Public Website Content (Readable by main site, writable only by Admin)
+    match /siteContent/{sectionId} {
+      allow get: if isValidId(sectionId);
+      allow list: if true;
+      allow create: if isValidId(sectionId)
+        && isAdmin()
+        && isValidSiteContent(incoming())
+        && incoming().sectionId == sectionId
+        && incoming().updatedByUid == request.auth.uid
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(sectionId)
+        && isAdmin()
+        && isValidSiteContent(incoming())
+        && incoming().sectionId == existing().sectionId
+        && incoming().updatedByUid == request.auth.uid
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['eyebrow', 'headline', 'subheadline', 'primaryCta', 'secondaryCta', 'qrImageUrl', 'footerTagline', 'updatedByUid', 'updatedAt']);
+      allow delete: if isValidId(sectionId) && isAdmin();
+    }
+
+    // Manageable Service Plans
+    match /servicePlans/{serviceId} {
+      allow get: if isValidId(serviceId);
+      allow list: if true;
+      allow create: if isValidId(serviceId)
+        && isAdmin()
+        && isValidServicePlan(incoming())
+        && incoming().serviceId == serviceId
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(serviceId)
+        && isAdmin()
+        && isValidServicePlan(incoming())
+        && incoming().serviceId == existing().serviceId
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['code', 'title', 'subtitle', 'priceInr', 'turnaround', 'scope', 'active', 'sortOrder', 'updatedAt']);
+      allow delete: if isValidId(serviceId) && isAdmin();
+    }
+
+    // Manageable FAQs
+    match /faqs/{faqId} {
+      allow get: if isValidId(faqId);
+      allow list: if true;
+      allow create: if isValidId(faqId)
+        && isAdmin()
+        && isValidFaqItem(incoming())
+        && incoming().faqId == faqId
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(faqId)
+        && isAdmin()
+        && isValidFaqItem(incoming())
+        && incoming().faqId == existing().faqId
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['question', 'answer', 'sortOrder', 'active', 'updatedAt']);
+      allow delete: if isValidId(faqId) && isAdmin();
+    }
+
+    // Operational Website Settings
+    match /settings/{settingId} {
+      allow get: if isValidId(settingId) && isAdmin();
+      allow list: if isAdmin();
+      allow create: if isValidId(settingId)
+        && isAdmin()
+        && isValidSiteSettings(incoming())
+        && incoming().settingId == settingId
+        && incoming().updatedByUid == request.auth.uid
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(settingId)
+        && isAdmin()
+        && isValidSiteSettings(incoming())
+        && incoming().settingId == existing().settingId
+        && incoming().updatedByUid == request.auth.uid
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['siteName', 'supportEmail', 'supportWhatsapp', 'upiDisplayLabel', 'upiMerchantName', 'maintenanceMode', 'allowNewOrders', 'strictUtrValidation', 'updatedByUid', 'updatedAt']);
+      allow delete: if isValidId(settingId) && isAdmin();
+    }
+
+    // Website Daily Analytics Snapshots
+    match /analyticsDaily/{dateKey} {
+      allow get: if isValidDateKey(dateKey) && isAdmin();
+      allow list: if isAdmin();
+      allow create: if isValidDateKey(dateKey)
+        && isAdmin()
+        && isValidAnalyticsSnapshot(incoming())
+        && incoming().dateKey == dateKey
+        && incoming().updatedAt == request.time;
+      allow update: if isValidDateKey(dateKey)
+        && isAdmin()
+        && isValidAnalyticsSnapshot(incoming())
+        && incoming().dateKey == existing().dateKey
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['pageViews', 'checkoutStarts', 'ordersCreated', 'paymentsVerified', 'revenueInr', 'updatedAt']);
+      allow delete: if isValidDateKey(dateKey) && isAdmin();
+    }
+
+    // Immutable Admin Audit Logs
+    match /auditLogs/{logId} {
+      allow get: if isValidId(logId) && isAdmin();
+      allow list: if isAdmin();
+      allow create: if isValidId(logId)
+        && isAdmin()
+        && isValidAuditLog(incoming())
+        && incoming().logId == logId
+        && incoming().actorUid == request.auth.uid
+        && incoming().createdAt == request.time;
+      allow update, delete: if false;
+    }
+  }
+}

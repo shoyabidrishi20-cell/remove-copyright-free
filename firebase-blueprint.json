@@ -1,0 +1,758 @@
+{
+  "entities": {
+    "AdminRole": {
+      "title": "AdminRole",
+      "description": "Authorized administrator directory entry used for server-side and Firestore RBAC.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Firebase Auth UID of the administrator."
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "maxLength": 160,
+          "description": "Verified Google account email address."
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "description": "Administrator display name."
+        },
+        "role": {
+          "type": "string",
+          "enum": ["super_admin", "admin"],
+          "description": "Administrative privilege tier."
+        },
+        "active": {
+          "type": "boolean",
+          "description": "Whether admin access is currently active."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last modification timestamp."
+        }
+      },
+      "required": ["uid", "email", "displayName", "role", "active", "createdAt", "updatedAt"]
+    },
+    "UserAccount": {
+      "title": "UserAccount",
+      "description": "Public creator/staff account metadata without PII.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Firebase Auth UID."
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "description": "Public display name."
+        },
+        "channelName": {
+          "type": "string",
+          "maxLength": 120,
+          "description": "Creator channel or brand handle."
+        },
+        "role": {
+          "type": "string",
+          "enum": ["creator", "moderator", "admin"],
+          "description": "Account role."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "suspended"],
+          "description": "Account status."
+        },
+        "totalCases": {
+          "type": "integer",
+          "description": "Count of copyright claim orders submitted."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last modification timestamp."
+        }
+      },
+      "required": ["uid", "displayName", "role", "status", "totalCases", "createdAt", "updatedAt"]
+    },
+    "UserPrivateInfo": {
+      "title": "UserPrivateInfo",
+      "description": "Isolated PII subcollection for user contact details.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Owner Firebase Auth UID."
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "maxLength": 160,
+          "description": "User email address."
+        },
+        "phone": {
+          "type": "string",
+          "maxLength": 32,
+          "description": "WhatsApp or phone contact."
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "Internal admin notes."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last modification timestamp."
+        }
+      },
+      "required": ["uid", "email", "updatedAt"]
+    },
+    "CaseOrder": {
+      "title": "CaseOrder",
+      "description": "Copyright claim or strike removal order shared with the main CR Remover portal.",
+      "type": "object",
+      "properties": {
+        "caseId": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 32,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Unique case order identifier."
+        },
+        "ownerUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Owner UID who submitted the order."
+        },
+        "serviceId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "description": "Selected service plan ID."
+        },
+        "serviceTitle": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "description": "Service plan title snapshot."
+        },
+        "platform": {
+          "type": "string",
+          "enum": ["YouTube", "Instagram Reels", "Facebook Video", "YouTube Shorts"],
+          "description": "Target video platform."
+        },
+        "videoUrl": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 500,
+          "description": "Claimed video or reel URL."
+        },
+        "claimantName": {
+          "type": "string",
+          "maxLength": 160,
+          "description": "Claimant or label name."
+        },
+        "creatorName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120,
+          "description": "Creator or channel name."
+        },
+        "contact": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 160,
+          "description": "WhatsApp number or email."
+        },
+        "amountInr": {
+          "type": "number",
+          "description": "Fixed service fee in INR."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["awaiting_payment", "verifying_payment", "dispute_filed", "claim_released", "rejected"],
+          "description": "Current order lifecycle state."
+        },
+        "paymentApp": {
+          "type": "string",
+          "enum": ["phonepe", "gpay", "paytm", "qr", "none"],
+          "description": "UPI payment channel."
+        },
+        "utrNumber": {
+          "type": "string",
+          "maxLength": 16,
+          "description": "12-digit UPI UTR reference."
+        },
+        "adminNotes": {
+          "type": "string",
+          "maxLength": 1000,
+          "description": "Internal administrator case notes."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last modification timestamp."
+        }
+      },
+      "required": [
+        "caseId",
+        "ownerUid",
+        "serviceId",
+        "serviceTitle",
+        "platform",
+        "videoUrl",
+        "claimantName",
+        "creatorName",
+        "contact",
+        "amountInr",
+        "status",
+        "paymentApp",
+        "utrNumber",
+        "adminNotes",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "PaymentRecord": {
+      "title": "PaymentRecord",
+      "description": "UPI payment transaction proof and verification record linked to a CaseOrder.",
+      "type": "object",
+      "properties": {
+        "paymentId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Unique payment record identifier."
+        },
+        "caseId": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 32,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Associated CaseOrder ID."
+        },
+        "ownerUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Payer or creator UID."
+        },
+        "payerName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "description": "Creator or payer display name."
+        },
+        "paymentApp": {
+          "type": "string",
+          "enum": ["phonepe", "gpay", "paytm", "qr"],
+          "description": "UPI app used for payment."
+        },
+        "utrNumber": {
+          "type": "string",
+          "minLength": 12,
+          "maxLength": 16,
+          "pattern": "^[0-9]{12}$",
+          "description": "12-digit UPI UTR / RRN number."
+        },
+        "amountInr": {
+          "type": "number",
+          "description": "Paid amount in INR."
+        },
+        "currency": {
+          "type": "string",
+          "enum": ["INR"],
+          "description": "Currency code."
+        },
+        "verificationStatus": {
+          "type": "string",
+          "enum": ["pending", "verified", "rejected", "refunded"],
+          "description": "Administrator verification status."
+        },
+        "verifiedByUid": {
+          "type": "string",
+          "maxLength": 128,
+          "description": "UID of verifying administrator."
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "Verification notes."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Submission timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last modification timestamp."
+        }
+      },
+      "required": [
+        "paymentId",
+        "caseId",
+        "ownerUid",
+        "payerName",
+        "paymentApp",
+        "utrNumber",
+        "amountInr",
+        "currency",
+        "verificationStatus",
+        "verifiedByUid",
+        "notes",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "SiteContent": {
+      "title": "SiteContent",
+      "description": "Editable website hero, QR banner, and footer copy shared with the main CR Remover site.",
+      "type": "object",
+      "properties": {
+        "sectionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Content section identifier."
+        },
+        "eyebrow": {
+          "type": "string",
+          "maxLength": 120,
+          "description": "Short section eyebrow label."
+        },
+        "headline": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 220,
+          "description": "Primary section headline."
+        },
+        "subheadline": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "Supporting descriptive text."
+        },
+        "primaryCta": {
+          "type": "string",
+          "maxLength": 80,
+          "description": "Primary call-to-action button label."
+        },
+        "secondaryCta": {
+          "type": "string",
+          "maxLength": 80,
+          "description": "Secondary button label."
+        },
+        "qrImageUrl": {
+          "type": "string",
+          "maxLength": 300,
+          "description": "Path or URL of the active UPI QR asset."
+        },
+        "footerTagline": {
+          "type": "string",
+          "maxLength": 200,
+          "description": "Footer tagline copy."
+        },
+        "updatedByUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "UID of last editor."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last modification timestamp."
+        }
+      },
+      "required": [
+        "sectionId",
+        "eyebrow",
+        "headline",
+        "subheadline",
+        "primaryCta",
+        "secondaryCta",
+        "qrImageUrl",
+        "footerTagline",
+        "updatedByUid",
+        "updatedAt"
+      ]
+    },
+    "ServicePlanDoc": {
+      "title": "ServicePlanDoc",
+      "description": "Manageable copyright claim removal plan and pricing stored in Firestore.",
+      "type": "object",
+      "properties": {
+        "serviceId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Service plan slug ID."
+        },
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 10,
+          "description": "Display index code."
+        },
+        "title": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120,
+          "description": "Plan title."
+        },
+        "subtitle": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 300,
+          "description": "Plan description."
+        },
+        "priceInr": {
+          "type": "number",
+          "description": "Fixed fee in INR."
+        },
+        "turnaround": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60,
+          "description": "Estimated turnaround window."
+        },
+        "scope": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60,
+          "description": "Plan scope summary."
+        },
+        "active": {
+          "type": "boolean",
+          "description": "Whether the plan is published on the main website."
+        },
+        "sortOrder": {
+          "type": "integer",
+          "description": "Display ordering index."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last modification timestamp."
+        }
+      },
+      "required": [
+        "serviceId",
+        "code",
+        "title",
+        "subtitle",
+        "priceInr",
+        "turnaround",
+        "scope",
+        "active",
+        "sortOrder",
+        "updatedAt"
+      ]
+    },
+    "FaqItemDoc": {
+      "title": "FaqItemDoc",
+      "description": "Manageable FAQ item displayed on the main website.",
+      "type": "object",
+      "properties": {
+        "faqId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "FAQ item ID."
+        },
+        "question": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 240,
+          "description": "Question text."
+        },
+        "answer": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 1200,
+          "description": "Answer text."
+        },
+        "sortOrder": {
+          "type": "integer",
+          "description": "Display ordering index."
+        },
+        "active": {
+          "type": "boolean",
+          "description": "Visibility toggle."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last modification timestamp."
+        }
+      },
+      "required": ["faqId", "question", "answer", "sortOrder", "active", "updatedAt"]
+    },
+    "SiteSettings": {
+      "title": "SiteSettings",
+      "description": "Platform configuration and operational settings managed by administrators.",
+      "type": "object",
+      "properties": {
+        "settingId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Settings document ID."
+        },
+        "siteName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "description": "Website brand name."
+        },
+        "supportEmail": {
+          "type": "string",
+          "format": "email",
+          "maxLength": 160,
+          "description": "Public support email."
+        },
+        "supportWhatsapp": {
+          "type": "string",
+          "maxLength": 32,
+          "description": "Support WhatsApp number."
+        },
+        "upiDisplayLabel": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "description": "Label rendered beside QR checkout."
+        },
+        "upiMerchantName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "description": "Merchant display name."
+        },
+        "maintenanceMode": {
+          "type": "boolean",
+          "description": "Puts public checkout into maintenance state."
+        },
+        "allowNewOrders": {
+          "type": "boolean",
+          "description": "Enables or pauses new order intake."
+        },
+        "strictUtrValidation": {
+          "type": "boolean",
+          "description": "Enforces 12-digit UTR format validation."
+        },
+        "updatedByUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "UID of last updating admin."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last modification timestamp."
+        }
+      },
+      "required": [
+        "settingId",
+        "siteName",
+        "supportEmail",
+        "supportWhatsapp",
+        "upiDisplayLabel",
+        "upiMerchantName",
+        "maintenanceMode",
+        "allowNewOrders",
+        "strictUtrValidation",
+        "updatedByUid",
+        "updatedAt"
+      ]
+    },
+    "AnalyticsSnapshot": {
+      "title": "AnalyticsSnapshot",
+      "description": "Daily website traffic and order conversion metrics.",
+      "type": "object",
+      "properties": {
+        "dateKey": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+          "maxLength": 10,
+          "description": "ISO date key YYYY-MM-DD."
+        },
+        "pageViews": {
+          "type": "integer",
+          "description": "Recorded page views for the date."
+        },
+        "checkoutStarts": {
+          "type": "integer",
+          "description": "Recorded checkout initiations."
+        },
+        "ordersCreated": {
+          "type": "integer",
+          "description": "Real orders created on this date."
+        },
+        "paymentsVerified": {
+          "type": "integer",
+          "description": "Real payments verified on this date."
+        },
+        "revenueInr": {
+          "type": "number",
+          "description": "Verified revenue in INR on this date."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last update timestamp."
+        }
+      },
+      "required": [
+        "dateKey",
+        "pageViews",
+        "checkoutStarts",
+        "ordersCreated",
+        "paymentsVerified",
+        "revenueInr",
+        "updatedAt"
+      ]
+    },
+    "AdminAuditLog": {
+      "title": "AdminAuditLog",
+      "description": "Immutable security and administrative action audit log.",
+      "type": "object",
+      "properties": {
+        "logId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Unique audit log ID."
+        },
+        "actorUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "UID of the admin who performed the action."
+        },
+        "actorEmail": {
+          "type": "string",
+          "format": "email",
+          "maxLength": 160,
+          "description": "Verified email of the actor."
+        },
+        "action": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "description": "Action verb identifier."
+        },
+        "targetType": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40,
+          "description": "Target entity type."
+        },
+        "targetId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Target document ID."
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300,
+          "description": "Human-readable audit summary."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp."
+        }
+      },
+      "required": ["logId", "actorUid", "actorEmail", "action", "targetType", "targetId", "summary", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/admins/{uid}": {
+      "schema": { "$ref": "#/entities/AdminRole" },
+      "description": "Authorized admin accounts directory."
+    },
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserAccount" },
+      "description": "Public creator and staff metadata without PII."
+    },
+    "/users/{userId}/private/{docId}": {
+      "schema": { "$ref": "#/entities/UserPrivateInfo" },
+      "description": "Isolated PII details restricted to account owner or admin."
+    },
+    "/orders/{caseId}": {
+      "schema": { "$ref": "#/entities/CaseOrder" },
+      "description": "Shared copyright removal orders submitted through the portal."
+    },
+    "/payments/{paymentId}": {
+      "schema": { "$ref": "#/entities/PaymentRecord" },
+      "description": "UPI payment proof and verification ledger."
+    },
+    "/siteContent/{sectionId}": {
+      "schema": { "$ref": "#/entities/SiteContent" },
+      "description": "Publicly readable, admin-editable website content blocks."
+    },
+    "/servicePlans/{serviceId}": {
+      "schema": { "$ref": "#/entities/ServicePlanDoc" },
+      "description": "Publicly readable, admin-editable pricing and service plans."
+    },
+    "/faqs/{faqId}": {
+      "schema": { "$ref": "#/entities/FaqItemDoc" },
+      "description": "Publicly readable, admin-editable FAQ items."
+    },
+    "/settings/{settingId}": {
+      "schema": { "$ref": "#/entities/SiteSettings" },
+      "description": "Operational website settings managed by administrators."
+    },
+    "/analyticsDaily/{dateKey}": {
+      "schema": { "$ref": "#/entities/AnalyticsSnapshot" },
+      "description": "Daily website analytics snapshots."
+    },
+    "/auditLogs/{logId}": {
+      "schema": { "$ref": "#/entities/AdminAuditLog" },
+      "description": "Append-only audit trail of admin actions."
+    }
+  }
+}
